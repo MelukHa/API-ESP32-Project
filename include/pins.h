@@ -4,8 +4,8 @@
 namespace Pins
 {
     // RGB LED
-    const int RGB_RED = 25;
-    const int RGB_GREEN = 33;
+    const int RGB_RED = 33;
+    const int RGB_GREEN = 25;
     const int RGB_BLUE = 26;
 
     // Capteurs

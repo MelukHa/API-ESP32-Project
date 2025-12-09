@@ -11,16 +11,18 @@ namespace APIHandlers
     void handleGetLight();
     void handleGetTemperature();
 
-    void handleLedRed();
-    void handleLedGreen();
-    void handleLedBlue();
-
-    void handleLinkBlueToLight();
-    void handleUnlinkBlueFromLight();
-    void handleLinkRedToTemp();
-    void handleUnlinkRedFromTemp();
+    void handleLinkRgbLightMode();
+    void handleUnlinkRgbLightMode();
+    void handleLinkRgbTempMode();
+    void handleUnlinkRgbTempMode();
 
     void sendError(int code, const char *message);
+
+    void handleGetThresholds();
+    void handleUpdateThresholds();
+
+    void handleLedColorJson();
+    void handleLedOff();
 }
 
 #endif

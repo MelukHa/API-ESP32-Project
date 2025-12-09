@@ -25,4 +25,8 @@ constexpr float THERM_REFERENCE_RES = 10000.0f;
 constexpr int SENSOR_READ_DELAY = 500;
 constexpr int SENSOR_INIT_DELAY = 100;
 
+// thresholds sensors
+extern float gLightThreshold;
+extern float gTempColdThreshold;
+extern float gTempHotThreshold;
 #endif

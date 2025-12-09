@@ -7,6 +7,10 @@
 #include "led_controller.h"
 #include "api_handlers.h"
 
+float gLightThreshold    = 30.0f;
+float gTempColdThreshold = 15.0f;
+float gTempHotThreshold  = 25.0f;
+
 const char *WIFI_SSID = "Livebox-74F0";
 const char *WIFI_PASSWORD = "Aaqy2gtC9AivP2uGgC";
 

@@ -12,13 +12,16 @@ void APIHandlers::setupRoutes(WebServer &srv)
     srv.on("/api/sensors", HTTP_GET, handleGetSensors);
     srv.on("/api/photoresistance", HTTP_GET, handleGetLight);
     srv.on("/api/thermoresistance", HTTP_GET, handleGetTemperature);
-    srv.on("/api/ledrgb/r", HTTP_PATCH, handleLedRed);
-    srv.on("/api/ledrgb/g", HTTP_PATCH, handleLedGreen);
-    srv.on("/api/ledrgb/b", HTTP_PATCH, handleLedBlue);
-    srv.on("/api/ledrgb/link", HTTP_PATCH, handleLinkBlueToLight);
-    srv.on("/api/ledrgb/unlink", HTTP_PATCH, handleUnlinkBlueFromLight);
-    srv.on("/api/ledrgb/link_temp", HTTP_PATCH, handleLinkRedToTemp);
-    srv.on("/api/ledrgb/unlink_temp", HTTP_PATCH, handleUnlinkRedFromTemp);
+    srv.on("/api/ledrgb/link_light", HTTP_PATCH, handleLinkRgbLightMode);
+    srv.on("/api/ledrgb/unlink_light", HTTP_PATCH, handleUnlinkRgbLightMode);
+    srv.on("/api/ledrgb/link_temp", HTTP_PATCH, handleLinkRgbTempMode);
+    srv.on("/api/ledrgb/unlink_temp", HTTP_PATCH, handleUnlinkRgbTempMode);
+
+    srv.on("/api/config/thresholds", HTTP_GET, handleGetThresholds);
+    srv.on("/api/config/thresholds", HTTP_PATCH, handleUpdateThresholds);
+    srv.on("/api/ledrgb/color", HTTP_PATCH, handleLedColorJson);
+    srv.on("/api/ledrgb/off", HTTP_PATCH, handleLedOff);
+    
 }
 
 void APIHandlers::sendError(int code, const char *message)
@@ -81,6 +84,9 @@ void APIHandlers::handleGetSensors()
     pins["g"] = Pins::RGB_GREEN;
     pins["b"] = Pins::RGB_BLUE;
 
+    rgb["light_linked"] = LEDController::isLightLinked();
+    rgb["temp_linked"]  = LEDController::isTempLinked();
+
     String response;
     serializeJson(doc, response);
     server.send(200, "application/json", response);
@@ -142,43 +148,7 @@ void APIHandlers::handleGetTemperature()
     server.send(200, "application/json", response);
 }
 
-void APIHandlers::handleLedRed()
-{
-    if (!SensorManager::isInitialized())
-    {
-        sendError(503, "RGB LED not available or not initialized");
-        return;
-    }
-
-    LEDController::setRed();
-    server.send(200, "application/json", "{\"status\":\"ok\",\"color\":\"red\"}");
-}
-
-void APIHandlers::handleLedGreen()
-{
-    if (!SensorManager::isInitialized())
-    {
-        sendError(503, "RGB LED not available or not initialized");
-        return;
-    }
-
-    LEDController::setGreen();
-    server.send(200, "application/json", "{\"status\":\"ok\",\"color\":\"green\"}");
-}
-
-void APIHandlers::handleLedBlue()
-{
-    if (!SensorManager::isInitialized())
-    {
-        sendError(503, "RGB LED not available or not initialized");
-        return;
-    }
-
-    LEDController::setBlue();
-    server.send(200, "application/json", "{\"status\":\"ok\",\"color\":\"blue\"}");
-}
-
-void APIHandlers::handleLinkBlueToLight()
+void APIHandlers::handleLinkRgbLightMode()
 {
     if (!SensorManager::isInitialized())
     {
@@ -193,18 +163,19 @@ void APIHandlers::handleLinkBlueToLight()
         return;
     }
 
-    LEDController::linkBlueToLight(true);
+    LEDController::linkRgbLightMode(true);
     server.send(200, "application/json", "{\"status\":\"ok\",\"link\":\"enabled\",\"color\":\"blue\"}");
 }
 
-void APIHandlers::handleUnlinkBlueFromLight()
+void APIHandlers::handleUnlinkRgbLightMode()
 {
-    LEDController::linkBlueToLight(false);
+    LEDController::linkRgbLightMode(false);
     LEDController::off();
+    LEDController::disableAllModes();
     server.send(200, "application/json", "{\"status\":\"ok\",\"link\":\"disabled\"}");
 }
 
-void APIHandlers::handleLinkRedToTemp()
+void APIHandlers::handleLinkRgbTempMode()
 {
     if (!SensorManager::isInitialized())
     {
@@ -219,13 +190,169 @@ void APIHandlers::handleLinkRedToTemp()
         return;
     }
 
-    LEDController::linkRedToTemp(true);
+    LEDController::linkRgbTempMode(true);
     server.send(200, "application/json", "{\"status\":\"ok\",\"link\":\"enabled\",\"color\":\"red\"}");
 }
 
-void APIHandlers::handleUnlinkRedFromTemp()
+void APIHandlers::handleUnlinkRgbTempMode()
 {
-    LEDController::linkRedToTemp(false);
+    LEDController::linkRgbTempMode(false);
     LEDController::off();
+    LEDController::disableAllModes();
     server.send(200, "application/json", "{\"status\":\"ok\",\"link\":\"disabled\"}");
+}
+
+void APIHandlers::handleGetThresholds()
+{
+    StaticJsonDocument<256> doc;
+    doc["light_threshold"] = gLightThreshold;
+    doc["temp_cold_threshold"] = gTempColdThreshold;
+    doc["temp_hot_threshold"] = gTempHotThreshold;
+
+    String response;
+    serializeJson(doc, response);
+    server.send(200, "application/json", response);
+}
+
+void APIHandlers::handleUpdateThresholds()
+{
+    Serial.println("handleUpdateThresholds() called");
+
+    if (!server.hasArg("plain")) {
+        Serial.println("  -> ERROR: Missing JSON body");
+        sendError(400, "Missing JSON body");
+        return;
+    }
+
+    String body = server.arg("plain");
+    Serial.print("  JSON body: ");
+    Serial.println(body);
+
+    StaticJsonDocument<256> doc;
+    DeserializationError err = deserializeJson(doc, body);
+
+    if (err) {
+        Serial.print("  -> ERROR: Invalid JSON: ");
+        Serial.println(err.c_str());
+        sendError(400, "Invalid JSON");
+        return;
+    }
+
+    // On affiche les valeurs avant mise à jour
+    Serial.print("  BEFORE: gLightThreshold=");
+    Serial.print(gLightThreshold);
+    Serial.print(", gTempColdThreshold=");
+    Serial.print(gTempColdThreshold);
+    Serial.print(", gTempHotThreshold=");
+    Serial.println(gTempHotThreshold);
+
+    if (doc.containsKey("light_threshold")) {
+        float lt = doc["light_threshold"].as<float>();
+        Serial.print("  Updating light_threshold -> ");
+        Serial.println(lt);
+        gLightThreshold = lt;
+    }
+
+    if (doc.containsKey("temp_cold_threshold")) {
+        float tc = doc["temp_cold_threshold"].as<float>();
+        Serial.print("  Updating temp_cold_threshold -> ");
+        Serial.println(tc);
+        gTempColdThreshold = tc;
+    }
+
+    if (doc.containsKey("temp_hot_threshold")) {
+        float th = doc["temp_hot_threshold"].as<float>();
+        Serial.print("  Updating temp_hot_threshold -> ");
+        Serial.println(th);
+        gTempHotThreshold = th;
+    }
+
+    // Sécurité: s'assurer que cold < hot
+    if (gTempColdThreshold >= gTempHotThreshold)
+    {
+        float mid = (gTempColdThreshold + gTempHotThreshold) / 2.0f;
+        gTempColdThreshold = mid - 1.0f;
+        gTempHotThreshold  = mid + 1.0f;
+        Serial.println("  Adjusted cold/hot thresholds to keep cold < hot");
+    }
+
+    // On affiche les valeurs après mise à jour
+    Serial.print("  AFTER: gLightThreshold=");
+    Serial.print(gLightThreshold);
+    Serial.print(", gTempColdThreshold=");
+    Serial.print(gTempColdThreshold);
+    Serial.print(", gTempHotThreshold=");
+    Serial.println(gTempHotThreshold);
+
+    StaticJsonDocument<256> out;
+    out["light_threshold"]       = gLightThreshold;
+    out["temp_cold_threshold"]   = gTempColdThreshold;
+    out["temp_hot_threshold"]    = gTempHotThreshold;
+
+    String response;
+    serializeJson(out, response);
+    server.send(200, "application/json", response);
+}
+
+void APIHandlers::handleLedColorJson()
+{
+    if (!SensorManager::isInitialized())
+    {
+        sendError(503, "RGB LED not available or not initialized");
+        return;
+    }
+
+    if (!server.hasArg("plain"))
+    {
+        sendError(400, "Missing JSON body");
+        return;
+    }
+
+    StaticJsonDocument<256> doc;
+    DeserializationError err = deserializeJson(doc, server.arg("plain"));
+
+    if (err)
+    {
+        sendError(400, "Invalid JSON");
+        return;
+    }
+
+    if (!doc.containsKey("r") || !doc.containsKey("g") || !doc.containsKey("b"))
+    {
+        sendError(400, "Missing r/g/b fields");
+        return;
+    }
+
+    int r = doc["r"];
+    int g = doc["g"];
+    int b = doc["b"];
+
+    r = constrain(r, 0, 255);
+    g = constrain(g, 0, 255);
+    b = constrain(b, 0, 255);
+
+    LEDController::setColor((uint8_t)r, (uint8_t)g, (uint8_t)b);
+
+    StaticJsonDocument<128> out;
+    out["status"] = "ok";
+    out["r"] = r;
+    out["g"] = g;
+    out["b"] = b;
+
+    String response;
+    serializeJson(out, response);
+    server.send(200, "application/json", response);
+}
+
+void APIHandlers::handleLedOff()
+{
+    LEDController::off();
+    LEDController::disableAllModes();
+    StaticJsonDocument<64> doc;
+    doc["status"] = "ok";
+    doc["color"]  = "off";
+
+    String res;
+    serializeJson(doc, res);
+    server.send(200, "application/json", res);
 }

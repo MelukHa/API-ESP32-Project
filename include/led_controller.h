@@ -9,13 +9,11 @@ public:
     static void initialize();
 
     static void setColor(uint8_t red, uint8_t green, uint8_t blue);
-    static void setRed();
-    static void setGreen();
-    static void setBlue();
     static void off();
+    static void disableAllModes();
 
-    static void linkBlueToLight(bool enable);
-    static void linkRedToTemp(bool enable);
+    static void linkRgbLightMode(bool enable);
+    static void linkRgbTempMode(bool enable);
 
     static bool isLightLinked();
     static bool isTempLinked();
@@ -28,6 +26,7 @@ private:
 
     static void updateLightLink();
     static void updateTempLink();
+    static void updateLightThresholdIndicator();
 };
 
 #endif
