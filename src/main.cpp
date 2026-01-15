@@ -6,13 +6,16 @@
 #include "sensors.h"
 #include "led_controller.h"
 #include "api_handlers.h"
+#include "display.h"
 
 float gLightThreshold    = 30.0f;
 float gTempColdThreshold = 15.0f;
 float gTempHotThreshold  = 25.0f;
 
-const char *WIFI_SSID = "Livebox-74F0";
-const char *WIFI_PASSWORD = "Aaqy2gtC9AivP2uGgC";
+static unsigned long gLastDisplayUpdate = 0;
+
+const char *WIFI_SSID = "Bbox-51B4C1FF"; //"HAARP_Anthena"; //"Livebox-74F0";
+const char *WIFI_PASSWORD = "aWLWpsPRQqPz576AQ5"; //"1357908642"; //"Aaqy2gtC9AivP2uGgC";
 
 WebServer server(SERVER_PORT);
 
@@ -70,6 +73,7 @@ void setup()
 
   LEDController::initialize();
   SensorManager::initialize();
+  Display::initialize();
 
   setupWiFi();
   setupOTA();
@@ -85,6 +89,10 @@ void loop()
   ArduinoOTA.handle();
   server.handleClient();
   LEDController::update();
+
+  float tempC    = SensorManager::readTemperature();
+  float lightPct = SensorManager::readLight();
+  Display::showSensors(tempC, lightPct);
 
   delay(SENSOR_READ_DELAY);
 }

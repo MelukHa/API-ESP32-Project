@@ -6,6 +6,7 @@
 
 bool LEDController::lightLinked = false;
 bool LEDController::tempLinked = true;
+bool LEDController::ledIsOn = true;
 
 void LEDController::initialize()
 {
@@ -48,6 +49,21 @@ void LEDController::off()
 
     // (optionnel) couper aussi la LED d’indication
     // digitalWrite(Pins::LED_INDICATOR, LOW);
+}
+
+void LEDController::ledOn()
+{
+    if(!ledIsOn){
+        ledIsOn = true;
+    }
+}
+
+void LEDController::ledOff()
+{
+    if(ledIsOn){
+        ledIsOn = false;
+        digitalWrite(Pins::LED_INDICATOR, LOW);
+    }
 }
 
 void LEDController::disableAllModes()
@@ -97,6 +113,11 @@ bool LEDController::isLightLinked()
 bool LEDController::isTempLinked()
 {
     return tempLinked;
+}
+
+bool LEDController::isLedOn()
+{
+    return ledIsOn;
 }
 
 void LEDController::updateLightLink()
@@ -255,9 +276,11 @@ void LEDController::update()
         updateTempLink();
     }
 
-    // check de la LED rouge de seuil (toujours active)
-    updateLightThresholdIndicator();
-
+    // check de la LED rouge de seuil
+    if(ledIsOn){
+        updateLightThresholdIndicator();
+    }
+    
     float lightPercent = SensorManager::readLight();
     float degrees = SensorManager::readTemperature();
     if (lightPercent >= 0)

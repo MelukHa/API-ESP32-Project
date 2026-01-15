@@ -22,6 +22,8 @@ namespace APIHandlers
     void handleUpdateThresholds();
 
     void handleLedColorJson();
+    void handleRGBOff();
+    void handleLedOn();
     void handleLedOff();
 }
 

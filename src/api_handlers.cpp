@@ -20,8 +20,9 @@ void APIHandlers::setupRoutes(WebServer &srv)
     srv.on("/api/config/thresholds", HTTP_GET, handleGetThresholds);
     srv.on("/api/config/thresholds", HTTP_PATCH, handleUpdateThresholds);
     srv.on("/api/ledrgb/color", HTTP_PATCH, handleLedColorJson);
-    srv.on("/api/ledrgb/off", HTTP_PATCH, handleLedOff);
-    
+    srv.on("/api/ledrgb/off", HTTP_PATCH, handleRGBOff);
+    srv.on("/api/led/on", HTTP_PATCH, handleLedOn);
+    srv.on("/api/led/off", HTTP_PATCH, handleLedOff);
 }
 
 void APIHandlers::sendError(int code, const char *message)
@@ -75,6 +76,7 @@ void APIHandlers::handleGetSensors()
     led["type"] = "digital";
     led["pin"] = Pins::LED_INDICATOR;
     led["state"] = digitalRead(Pins::LED_INDICATOR);
+    led["mode"] = LEDController::isLedOn() ? "on" : "off";
 
     JsonObject rgb = sensors.createNestedObject();
     rgb["id"] = "rgb_led";
@@ -344,10 +346,34 @@ void APIHandlers::handleLedColorJson()
     server.send(200, "application/json", response);
 }
 
-void APIHandlers::handleLedOff()
+void APIHandlers::handleRGBOff()
 {
     LEDController::off();
     LEDController::disableAllModes();
+    StaticJsonDocument<64> doc;
+    doc["status"] = "ok";
+    doc["color"]  = "off";
+
+    String res;
+    serializeJson(doc, res);
+    server.send(200, "application/json", res);
+}
+
+void APIHandlers::handleLedOn()
+{
+    LEDController::ledOn();
+    StaticJsonDocument<64> doc;
+    doc["status"] = "ok";
+    doc["color"]  = "on";
+
+    String res;
+    serializeJson(doc, res);
+    server.send(200, "application/json", res);
+}
+
+void APIHandlers::handleLedOff()
+{
+    LEDController::ledOff();
     StaticJsonDocument<64> doc;
     doc["status"] = "ok";
     doc["color"]  = "off";
